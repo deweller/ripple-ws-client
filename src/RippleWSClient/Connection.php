@@ -257,9 +257,14 @@ class Connection
         }
 
         if(0x0 === $out['mask']) {
-
-            $out['message'] = fread($socket, $length);
-
+            $msg = '';
+            $read_length = 0;
+            while ($read_length < $length) {
+                $to_read = $length - $read_length; 
+                $msg .= fread($socket, $to_read);
+                $read_length = strlen($msg);
+            }
+            $out['message'] = $msg;
             return $out;
         }
 
@@ -274,6 +279,7 @@ class Connection
 
             $buffer = min($bufferLength, $length - $i);
             $handle = fread($socket, $buffer);
+            print "\$handle (".strlen($handle)."): ".substr($handle, 0, 5)."...".substr($handle, -5)."\n";
 
             for($j = 0, $_length = strlen($handle); $j < $_length; ++$j) {
 
