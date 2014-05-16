@@ -34,10 +34,14 @@ class Connection
         $this->getConnectionSocket();
     }
 
+    public function close() {
+        fclose($this->socket_connection);
+    }
 
     public function send($content)
     {
         $socket = $this->getConnectionSocket();
+        if (!$socket OR !is_resource($socket)) { throw new Exception("Failed to connect", 1); }
 
         $OPCODE_TEXT_FRAME = 0x1;
         $frame = $this->buildFrame($content, $OPCODE_TEXT_FRAME);
@@ -55,6 +59,11 @@ class Connection
 
     ////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////
+
+    protected function resetConnection() {
+        $this->socket_connection = null;
+        $this->connection_key    = null;
+    }
 
     protected function getConnectionSocket() {
         if ($this->socket_connection !== null) { return $this->socket_connection; }
@@ -75,7 +84,7 @@ class Connection
 
         $socket = stream_socket_client($url, $errno, $errstr, $this->timeout, STREAM_CLIENT_CONNECT, stream_context_create([]));
         if ($errno) { throw new ConnectionException($errstr, $errno); }
-        if (!$socket) { throw new ConnectionException("Failed to connect", 1); }
+        if (!$socket OR !is_resource($socket)) { throw new ConnectionException("Failed to connect", 1); }
 
         // make sure it is connected
         $connected_name = stream_socket_get_name($socket, true);
@@ -199,6 +208,7 @@ class Connection
     }
 
     protected function readFrame ($socket) {
+        if (!$socket OR !is_resource($socket)) { throw new Exception("Connection closed", 1); }
         $OPCODE_CONNECTION_CLOSE   = 0x8;
 
         $out  = array();
