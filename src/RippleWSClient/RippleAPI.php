@@ -380,6 +380,30 @@ class RippleAPI
     }
 
     protected function wsCall($method, $params=[]) {
+        $done = false;
+        while (!$done) {
+            try {
+                $raw_response = $this->rawWSCall($method, $params);
+                break;
+            } catch (RippleAPIException $e) {
+                Debug::trace("error=".$e->getRippleErrorName(),__FILE__,__LINE__,$this);
+                if ($e->getRippleErrorName() == 'slowDown') {
+                    $sleep = rand(50000, 1000000);
+                    Debug::trace("slow down request received. sleeping for $sleep...",__FILE__,__LINE__,$this);
+
+                    // slow down
+                    usleep($sleep); // 50ms - 1 second
+                } else {
+                    throw $e;
+                }
+            }
+
+        }
+
+        return $raw_response;
+    }
+
+    protected function rawWSCall($method, $params=[]) {
         // 'id' => $this->guid()
         $json_out = array_merge(['command' => $method], $params);
 
@@ -389,26 +413,27 @@ class RippleAPI
         if (!$response_string) { throw new Exception("No response", 1); }
         $response = json_decode($response_string, true);
         if (!$response) { throw new Exception("Unexpected response: $response_string", 1); }
-        if (!isset($response['result'])) { throw new Exception("Unexpected Response: ".json_encode($response), 1); }
 
-        $result = $response['result'];
+        $result = isset($response['result']) ? $response['result'] : null;
 
         if (isset($result['error'])) {
             // [error] => actNotFound
             // [error_code] => 14
             // [error_message] => Account not found.
             if (isset($result['error_message'])) {
-                throw new RippleAPIException("Ripple error: {$result['error_message']} ({$result['error_code']})", $result['error_code']);
+                throw new RippleAPIException("Ripple error: {$result['error_message']} ({$result['error_code']})", $result['error_code'], $result);
             }
             if (isset($result['error_exception'])) {
-                throw new RippleAPIException("Ripple error: {$result['error_exception']} ({$result['error']})", 1);
+                throw new RippleAPIException("Ripple error: {$result['error_exception']} ({$result['error']})", 1, $result);
             }
 
-            throw new RippleAPIException("Ripple error: {$result['error']}", 1);
+            throw new RippleAPIException("Ripple error: {$result['error']}", 1, $result);
         }
+
+        if (!isset($response['result'])) { throw new Exception("Unexpected Response: ".json_encode($response), 1, $result); }
         
         if ($response['status'] != 'success') {
-            throw new RippleAPIException("Error: ".json_encode($result), 1);
+            throw new RippleAPIException("Error: ".json_encode($result), 1, $result);
         }
 
         return $result;
@@ -416,7 +441,7 @@ class RippleAPI
 
     protected function checkEngineResultCode($result) {
         if ($result['engine_result_code'] > 0) {
-            throw new RippleAPIException("Error: {$result['engine_result_message']}", $result['engine_result_code']);
+            throw new RippleAPIException("Error: {$result['engine_result_message']}", $result['engine_result_code'], $result);
         }
     }
 
