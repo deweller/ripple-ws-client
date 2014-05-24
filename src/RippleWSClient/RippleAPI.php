@@ -412,7 +412,8 @@ class RippleAPI
         $response_string = $this->connection->send(json_encode($json_out));
         if (!$response_string) { throw new Exception("No response", 1); }
         $response = json_decode($response_string, true);
-        if (!$response) { throw new Exception("Unexpected response: $response_string", 1); }
+        if (!$response) { throw new Exception("Unexpected response: $response_string.  Request was: ".json_encode(array_merge(['command' => $method], $params), JSON_PRETTY_PRINT), 1); }
+        if (!isset($response['result'])) { throw new Exception("Unexpected Response: ".json_encode($response), 1); }
 
         $result = isset($response['result']) ? $response['result'] : null;
 
